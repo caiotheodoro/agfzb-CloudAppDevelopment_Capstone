@@ -2,10 +2,10 @@ import requests
 import json
 # import related models here
 from requests.auth import HTTPBasicAuth
-from dotenv import load_dotenv,find_dotenv
+# from dotenv import load_dotenv,find_dotenv
 
 
-load_dotenv(find_dotenv())
+# load_dotenv(find_dotenv())
 
 # Create a `get_request` to make HTTP GET requests
 # e.g., response = requests.get(url, params=params, headers={'Content-Type': 'application/json'},

@@ -12,6 +12,8 @@ from datetime import datetime
 import logging
 import json
 
+from djangoapp import models
+
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
 
@@ -111,29 +113,48 @@ def get_dealer_details(request, dealer_id):
 # Create a `add_review` view to submit a review
 # def add_review(request, dealer_id):
 def add_review(request, dealer_id):
-    if request.method == "GET":
-        url = f"https://service.eu.apiconnect.ibmcloud.com/gws/apigateway/api/a9220b6d6b26f1eb3b657a98770b743616f7d4cd223b89cd1ca4e88ab49bdb92/api/dealership?dealerId={dealer_id}"
-        context = {
-            "cars": CarModel.objects.all(),
-            "dealer": get_dealers_from_cf(url)[0],
-        }
-        print(context)
-        return render(request, 'djangoapp/add_review.html', context)
-    if request.method == "POST":
-        form = request.POST
-        review = {
-            "name": f"{request.user.first_name} {request.user.last_name}",
-            "dealership": dealer_id,
-            "review": form["content"],
-            "purchase": form.get("purchasecheck"),
-            }
-        if form.get("purchasecheck"):
-            review["purchasedate"] = datetime.strptime(form.get("purchasedate"), "%m/%d/%Y").isoformat()
-            car = CarModel.objects.get(pk=form["car"])
-            review["car_make"] = car.car_make.name
-            review["car_model"] = car.name
-            review["car_year"]= car.year.strftime("%Y")
-        json_payload = {"review": review}
-        URL = 'https://service.eu.apiconnect.ibmcloud.com/gws/apigateway/api/a9220b6d6b26f1eb3b657a98770b743616f7d4cd223b89cd1ca4e88ab49bdb92/api/review'
-        post_request(URL, json_payload, dealerId=dealer_id)
-    return redirect("djangoapp:dealer_details", dealer_id=dealer_id)
+
+    if request.user.is_authenticated:
+        context={}
+        if request.method == "GET":
+            cars = models.CarModel.objects.filter(dealer_id=dealer_id)
+            #cars = models.CarModel.objects.filter(dealer_id=dealer_id)
+            context['cars'] = cars
+            context['dealer_id']=dealer_id
+            return render(request, 'djangoapp/add_review.html', context)
+        elif request.method == "POST":
+            print(request.POST)
+            url = "https://service.eu.apiconnect.ibmcloud.com/gws/apigateway/api/a9220b6d6b26f1eb3b657a98770b743616f7d4cd223b89cd1ca4e88ab49bdb92/api/review"
+            review = {}
+            #review["id"] = get_reviews_count(url) + '{#}'
+            review["id"] = get_reviews_count(url) + 1
+            review["time"] = datetime.utcnow().isoformat()
+            review["dealerId"] = dealer_id
+            review["review"] = request.POST["content"]
+            review["name"] = request.user.username
+            if request.POST['purchasecheck'] == "on":
+                review["purchase"] = True #change from True
+            else:
+                review["purchase"] = False
+                review["purchase_date"]= request.POST["purchasedate"]
+                review["car_make"] = models.carmake.name
+                review["car_model"] = models.carmodel.name
+                review["car_year"]= models.carmodel.year.strftime("%Y")
+                #review["car_make"] = car.carmake.name
+                #review["car_model"] = car.name
+                #review["car_year"]= car.year.strftime("%Y")
+                
+                #review["car_make"]= "Jeep"
+                #review["car_model"]= "Gladiator"
+                #review["car_year"]= 2021
+
+                json_payload = {}
+                json_payload = review
+                print (json_payload)
+                #restapis.post_request(url, json_payload, dealerId=dealer_id)
+                response = post_request(url, json_payload, params=review)
+            return redirect('djangoapp:dealer_details', dealer_id=dealer_id)
+        else:
+            return HttpResponse("Invalid Request type: " + request.method)
+    else:
+        return HttpResponse("User not authenticated")
